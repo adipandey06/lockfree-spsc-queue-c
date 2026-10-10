@@ -1,10 +1,11 @@
 #include <stdbool.h>
+#include <stdatomic.h>
 
 typedef struct {
-    const int capacity;
-    int tail;
-    int head;    
-    const void** ptrToRingBuffer;
+    int capacity;
+    atomic_int tail;
+    atomic_int head;    
+    void** ptrToRingBuffer;
 } lockfreeSpscQueue;
 
 
