@@ -1,6 +1,11 @@
 # lockfree-spsc-queue-c
 a lock-free single-producer-single-consumer queue in c
 
+## variants
+
+- `src/0-naive`, `src/1-cached_indices_and_padding`, `src/2-bitwise_modulus`: acquire/release based variants.
+- `src/0-naive-seq_cst`, `src/1-cached_indices_and_padding-seq_cst`, `src/2-bitwise_modulus-seq_cst`: sequential-consistency variants where all atomic accesses use `memory_order_seq_cst`.
+
 
 ### book-keeping policies
 
