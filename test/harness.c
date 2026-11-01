@@ -1,5 +1,5 @@
 #define _GNU_SOURCE // Enables pthread_barrier_t and pthread_setaffinity_np
-#include "src/core.h"
+#include "core.h" // using compiler include path for each queue implementation
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
