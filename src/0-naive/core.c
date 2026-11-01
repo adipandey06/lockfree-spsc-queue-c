@@ -59,6 +59,11 @@ bool tryPopFromQueue (lockfreeSpscQueue* ptrToQueue, void** ptrToPutPoppedItem) 
 };
 
 
+bool isLockFree (lockfreeSpscQueue* ptrToQueue) {
+    return atomic_is_lock_free(&(ptrToQueue -> head)) && atomic_is_lock_free(&(ptrToQueue -> tail));
+}
+
+
 
 
 void destroyQueue (lockfreeSpscQueue* ptrToQueue) {
