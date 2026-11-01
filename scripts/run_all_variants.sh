@@ -9,9 +9,13 @@ HARNESS_CORE="${HARNESS_CORE:-2}"
 
 VARIANTS=(
   "0-naive"
+  "1-padding_without_cached_indices"
+  "2-cached_indices_without_padding"
   "1-cached_indices_and_padding"
   "2-bitwise_modulus"
   "0-naive-seq_cst"
+  "1-padding_without_cached_indices-seq_cst"
+  "2-cached_indices_without_padding-seq_cst"
   "1-cached_indices_and_padding-seq_cst"
   "2-bitwise_modulus-seq_cst"
 )
