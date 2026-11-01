@@ -15,4 +15,6 @@ bool tryPushToQueue (lockfreeSpscQueue* ptrToQueue, void* ptrToItem);
 
 bool tryPopFromQueue (lockfreeSpscQueue* ptrToQueue, void** ptrToPutPoppedItem);
 
+bool isLockFree (lockfreeSpscQueue* ptrToQueue);
+
 void destroyQueue (lockfreeSpscQueue* ptrToQueue);
