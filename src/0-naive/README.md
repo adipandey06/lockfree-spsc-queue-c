@@ -1,0 +1,1 @@
+documentation [here](https://github.com/adipandey06/lockfree-spsc-queue-c/issues/2).
