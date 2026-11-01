@@ -30,8 +30,9 @@ CPU_SET=0,1,2 ./run_containerized_harness.sh ./results 1000 2 1048576
 
 after generating csvs in `./results`, open `latency_analysis.ipynb` to analyze and visualize latencies:
 
-- box plot across all variants,
-- per-variant distribution overlays for `acq_rel` vs `seq_cst`.
+- one box plot per variant across the five buffer sizes,
+- all variants compared at the smallest and largest buffer sizes,
+- latency distribution overlays for each buffer size.
 
 
 ### book-keeping policies

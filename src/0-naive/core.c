@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdlib.h>
 #include "core.h"
 
 lockfreeSpscQueue* initQueue (int capacity) { // returns a pointer to the struct representing the queue
