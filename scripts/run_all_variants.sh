@@ -3,7 +3,6 @@ set -euo pipefail
 
 OUTPUT_DIR="${OUTPUT_DIR:-/results}"
 SAMPLE_INTERVAL="${SAMPLE_INTERVAL:-1000}"
-MIN_BUFFER_SIZE="${MIN_BUFFER_SIZE:-2}"
 NUM_ELEMENTS="${NUM_ELEMENTS:-1048576}"
 HARNESS_CORE="${HARNESS_CORE:-2}"
 
@@ -34,10 +33,11 @@ for variant in "${VARIANTS[@]}"; do
 
   (
     cd "${run_dir}"
-    taskset -c "${HARNESS_CORE}" "${binary_path}" "${SAMPLE_INTERVAL}" "${MIN_BUFFER_SIZE}" "${NUM_ELEMENTS}"
-    mv latency_throughput.csv "${OUTPUT_DIR}/${variant}.csv"
+    taskset -c "${HARNESS_CORE}" "${binary_path}" "${SAMPLE_INTERVAL}" "${NUM_ELEMENTS}"
+    mkdir -p "${OUTPUT_DIR}/${variant}"
+    mv latency_throughput_buffer_*.csv "${OUTPUT_DIR}/${variant}/"
   )
 
   rm -rf "${run_dir}" "${binary_path}"
-  echo "Saved ${OUTPUT_DIR}/${variant}.csv"
+  echo "Saved ${OUTPUT_DIR}/${variant}/latency_throughput_buffer_*.csv"
 done

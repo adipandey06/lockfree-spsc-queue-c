@@ -40,107 +40,117 @@ void* consumerThread(void* cArgs);
 void pinThreadToCore(pthread_t thread, int coreId);
 
 int main(int argc, char* argv[]) {
+    
+
     int sampleInterval = (argc > 1) ? atoi(argv[1]) : DEFAULT_SAMPLE_INTERVAL;
-    int minBufferSize  = (argc > 2) ? atoi(argv[2]) : DEFAULT_MIN_BUFFER_SIZE;
-    int numElements    = (argc > 3) ? atoi(argv[3]) : DEFAULT_NUM_ELEMENTS;
+    int numElements    = (argc > 2) ? atoi(argv[2]) : DEFAULT_NUM_ELEMENTS;
     int numSamples     = (numElements + sampleInterval - 1) / sampleInterval;
+    const int bufferSizes[] = {2, 4, 16, 4096, 65536};
+    const int numBufferSizes = sizeof(bufferSizes) / sizeof(bufferSizes[0]);
 
-    // 1. Initialize Queue
-    lockfreeSpscQueue* ptrToQueue = initQueue(minBufferSize);
+    for (int bufferIndex = 0; bufferIndex < numBufferSizes; bufferIndex++) {
+        int minBufferSize = bufferSizes[bufferIndex];
 
-    // 2. Initialize Elements to Push
-    void** ptrToElementsToPush = malloc(sizeof(void*) * numElements);
-    for (int i = 0; i < numElements; i++) {
-        ptrToElementsToPush[i] = malloc(sizeof(int));
-        *((int*)ptrToElementsToPush[i]) = i;
-    }
+        // 1. Initialize Queue
+        lockfreeSpscQueue* ptrToQueue = initQueue(minBufferSize);
 
-    // 3. Allocate Popped Array & Timestamp Arrays (sized to numSamples)
-    void** ptrToPutPoppedElements      = malloc(sizeof(void*) * numElements);
-    struct timespec* ptrToPushTimestamps = malloc(sizeof(struct timespec) * numSamples);
-    struct timespec* ptrToPopTimestamps  = malloc(sizeof(struct timespec) * numSamples);
-    struct timespec* ptrToStartTimestamp = malloc(sizeof(struct timespec));
-    struct timespec* ptrToEndTimestamp   = malloc(sizeof(struct timespec));
+        // 2. Initialize Elements to Push
+        void** ptrToElementsToPush = malloc(sizeof(void*) * numElements);
+        for (int i = 0; i < numElements; i++) {
+            ptrToElementsToPush[i] = malloc(sizeof(int));
+            *((int*)ptrToElementsToPush[i]) = i;
+        }
 
-    // 4. Pre-Fault Arrays using exact byte sizes (do NOT overwrite ptrToQueue struct fields)
-    preFault(sizeof(void*) * numElements, ptrToPutPoppedElements);
-    preFault(sizeof(struct timespec) * numSamples, ptrToPushTimestamps);
-    preFault(sizeof(struct timespec) * numSamples, ptrToPopTimestamps);
-    preFault(sizeof(struct timespec), ptrToStartTimestamp);
-    preFault(sizeof(struct timespec), ptrToEndTimestamp);
+        // 3. Allocate Popped Array & Timestamp Arrays (sized to numSamples)
+        void** ptrToPutPoppedElements      = malloc(sizeof(void*) * numElements);
+        struct timespec* ptrToPushTimestamps = malloc(sizeof(struct timespec) * numSamples);
+        struct timespec* ptrToPopTimestamps  = malloc(sizeof(struct timespec) * numSamples);
+        struct timespec* ptrToStartTimestamp = malloc(sizeof(struct timespec));
+        struct timespec* ptrToEndTimestamp   = malloc(sizeof(struct timespec));
 
-    // 5. Set up synchronization barrier and thread args
-    pthread_barrier_t startBarrier;
-    pthread_barrier_init(&startBarrier, NULL, 2);
+        // 4. Pre-Fault Arrays using exact byte sizes (do NOT overwrite ptrToQueue struct fields)
+        preFault(sizeof(void*) * numElements, ptrToPutPoppedElements);
+        preFault(sizeof(struct timespec) * numSamples, ptrToPushTimestamps);
+        preFault(sizeof(struct timespec) * numSamples, ptrToPopTimestamps);
+        preFault(sizeof(struct timespec), ptrToStartTimestamp);
+        preFault(sizeof(struct timespec), ptrToEndTimestamp);
 
-    ProducerArgs producerArgs = {
-        .ptrToQueue = ptrToQueue,
-        .startBarrier = &startBarrier,
-        .ptrToElementsToPush = ptrToElementsToPush,
-        .numElementsToPush = numElements,
-        .sampleInterval = sampleInterval,
-        .ptrToPushTimestamps = ptrToPushTimestamps,
-        .ptrToStartTimestamp = ptrToStartTimestamp
-    };
+        // 5. Set up synchronization barrier and thread args
+        pthread_barrier_t startBarrier;
+        pthread_barrier_init(&startBarrier, NULL, 2);
 
-    ConsumerArgs consumerArgs = {
-        .ptrToQueue = ptrToQueue,
-        .startBarrier = &startBarrier,
-        .ptrToPutPoppedElements = ptrToPutPoppedElements,
-        .numElementsToPop = numElements,
-        .sampleInterval = sampleInterval,
-        .ptrToPopTimestamps = ptrToPopTimestamps,
-        .ptrToEndTimestamp = ptrToEndTimestamp
-    };
+        ProducerArgs producerArgs = {
+            .ptrToQueue = ptrToQueue,
+            .startBarrier = &startBarrier,
+            .ptrToElementsToPush = ptrToElementsToPush,
+            .numElementsToPush = numElements,
+            .sampleInterval = sampleInterval,
+            .ptrToPushTimestamps = ptrToPushTimestamps,
+            .ptrToStartTimestamp = ptrToStartTimestamp
+        };
 
-    // 6. Create and pin threads to distinct cores
-    pthread_t producerThreadId, consumerThreadId;
-    pthread_create(&producerThreadId, NULL, producerThread, &producerArgs);
-    pthread_create(&consumerThreadId, NULL, consumerThread, &consumerArgs);
+        ConsumerArgs consumerArgs = {
+            .ptrToQueue = ptrToQueue,
+            .startBarrier = &startBarrier,
+            .ptrToPutPoppedElements = ptrToPutPoppedElements,
+            .numElementsToPop = numElements,
+            .sampleInterval = sampleInterval,
+            .ptrToPopTimestamps = ptrToPopTimestamps,
+            .ptrToEndTimestamp = ptrToEndTimestamp
+        };
 
-    pinThreadToCore(producerThreadId, PRODUCER_CORE);
-    pinThreadToCore(consumerThreadId, CONSUMER_CORE);
+        // 6. Create and pin threads to distinct cores
+        pthread_t producerThreadId, consumerThreadId;
+        pthread_create(&producerThreadId, NULL, producerThread, &producerArgs);
+        pthread_create(&consumerThreadId, NULL, consumerThread, &consumerArgs);
 
-    // 7. Wait for both threads to finish
-    pthread_join(producerThreadId, NULL);
-    pthread_join(consumerThreadId, NULL);
-    pthread_barrier_destroy(&startBarrier);
+        pinThreadToCore(producerThreadId, PRODUCER_CORE);
+        pinThreadToCore(consumerThreadId, CONSUMER_CORE);
 
-    // 8. Correctness check
-    for (int i = 0; i < numElements; i++) {
-        if (ptrToElementsToPush[i] != ptrToPutPoppedElements[i]) {
-            fprintf(stderr, "Error: Element at index %d does not match\n", i);
+        // 7. Wait for both threads to finish
+        pthread_join(producerThreadId, NULL);
+        pthread_join(consumerThreadId, NULL);
+        pthread_barrier_destroy(&startBarrier);
+
+        // 8. Correctness check
+        for (int i = 0; i < numElements; i++) {
+            if (ptrToElementsToPush[i] != ptrToPutPoppedElements[i]) {
+                fprintf(stderr, "Error: Element at index %d does not match\n", i);
+                return 1;
+            }
+        }
+
+        // 9. Write sampled timestamps to CSV
+        char outputFilename[64];
+        snprintf(outputFilename, sizeof(outputFilename),
+                "latency_throughput_buffer_%d.csv", minBufferSize);
+        FILE* fp = fopen(outputFilename, "w");
+        if (fp == NULL) {
+            fprintf(stderr, "Error: Could not open file for writing\n");
             return 1;
         }
-    }
+        fprintf(fp, "PushTimestamp,PopTimestamp,StartTimestamp,EndTimestamp\n");
+        for (int s = 0; s < numSamples; s++) {
+            fprintf(fp, "%ld.%09ld,%ld.%09ld,%ld.%09ld,%ld.%09ld\n",
+                    ptrToPushTimestamps[s].tv_sec, ptrToPushTimestamps[s].tv_nsec,
+                    ptrToPopTimestamps[s].tv_sec, ptrToPopTimestamps[s].tv_nsec,
+                    ptrToStartTimestamp->tv_sec, ptrToStartTimestamp->tv_nsec,
+                    ptrToEndTimestamp->tv_sec, ptrToEndTimestamp->tv_nsec);
+        }
+        fclose(fp);
 
-    // 9. Write sampled timestamps to CSV
-    FILE* fp = fopen("latency_throughput.csv", "w");
-    if (fp == NULL) {
-        fprintf(stderr, "Error: Could not open file for writing\n");
-        return 1;
+        // 10. Free memory cleanly
+        for (int i = 0; i < numElements; i++) {
+            free(ptrToElementsToPush[i]);
+        }
+        free(ptrToElementsToPush);
+        free(ptrToPutPoppedElements);
+        free(ptrToPushTimestamps);
+        free(ptrToPopTimestamps);
+        free(ptrToStartTimestamp);
+        free(ptrToEndTimestamp);
+        destroyQueue(ptrToQueue); // Replace with destroyQueue(ptrToQueue) if internal buffer was malloc'd
     }
-    fprintf(fp, "PushTimestamp,PopTimestamp,StartTimestamp,EndTimestamp\n");
-    for (int s = 0; s < numSamples; s++) {
-        fprintf(fp, "%ld.%09ld,%ld.%09ld,%ld.%09ld,%ld.%09ld\n",
-                ptrToPushTimestamps[s].tv_sec, ptrToPushTimestamps[s].tv_nsec,
-                ptrToPopTimestamps[s].tv_sec, ptrToPopTimestamps[s].tv_nsec,
-                ptrToStartTimestamp->tv_sec, ptrToStartTimestamp->tv_nsec,
-                ptrToEndTimestamp->tv_sec, ptrToEndTimestamp->tv_nsec);
-    }
-    fclose(fp);
-
-    // 10. Free memory cleanly
-    for (int i = 0; i < numElements; i++) {
-        free(ptrToElementsToPush[i]);
-    }
-    free(ptrToElementsToPush);
-    free(ptrToPutPoppedElements);
-    free(ptrToPushTimestamps);
-    free(ptrToPopTimestamps);
-    free(ptrToStartTimestamp);
-    free(ptrToEndTimestamp);
-    free(ptrToQueue); // Replace with destroyQueue(ptrToQueue) if internal buffer was malloc'd
 
     return 0;
 }

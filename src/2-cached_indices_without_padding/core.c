@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdlib.h>
 #include "core.h"
 
 lockfreeSpscQueue* initQueue (int capacity) { // returns a pointer to the struct representing the queue
@@ -73,4 +74,9 @@ bool tryPopFromQueue (lockfreeSpscQueue* ptrToQueue, void** ptrToPutPoppedItem) 
 
 bool isLockFree (lockfreeSpscQueue* ptrToQueue) {
 	return atomic_is_lock_free(&(ptrToQueue -> head)) && atomic_is_lock_free(&(ptrToQueue -> tail));
+}
+
+void destroyQueue (lockfreeSpscQueue* ptrToQueue) {
+	free(ptrToQueue->ptrToRingBuffer);
+	free(ptrToQueue);
 }
