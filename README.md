@@ -3,8 +3,8 @@ a lock-free single-producer-single-consumer queue in c
 
 ## variants
 
-- `src/0-naive`, `src/1-cached_indices_and_padding`, `src/2-bitwise_modulus`: acquire/release based variants.
-- `src/0-naive-seq_cst`, `src/1-cached_indices_and_padding-seq_cst`, `src/2-bitwise_modulus-seq_cst`: sequential-consistency variants where all atomic accesses use `memory_order_seq_cst`.
+- `src/0-naive`, `src/1-padding_without_cached_indices`, `src/2-cached_indices_without_padding`, `src/1-cached_indices_and_padding`, `src/2-bitwise_modulus`: acquire/release based variants.
+- `src/0-naive-seq_cst`, `src/1-padding_without_cached_indices-seq_cst`, `src/2-cached_indices_without_padding-seq_cst`, `src/1-cached_indices_and_padding-seq_cst`, `src/2-bitwise_modulus-seq_cst`: sequential-consistency variants where all atomic accesses use `memory_order_seq_cst`.
 
 ## containerized harness run
 
@@ -17,7 +17,7 @@ run every queue variant in docker and save each latency csv into a host director
 this script:
 - builds the image from `Dockerfile`,
 - runs it with `--cpuset-cpus=0,1,2` by default (exactly 3 host cores),
-- compiles/runs the harness against all six queue variants,
+- compiles/runs the harness against all ten queue variants,
 - writes one csv per variant to `./results`.
 
 you can override harness/runtime settings:
