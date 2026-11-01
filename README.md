@@ -26,6 +26,13 @@ you can override harness/runtime settings:
 CPU_SET=0,1,2 ./run_containerized_harness.sh ./results 1000 2 1048576
 ```
 
+## latency analysis notebook
+
+after generating csvs in `./results`, open `latency_analysis.ipynb` to analyze and visualize latencies:
+
+- box plot across all variants,
+- per-variant distribution overlays for `acq_rel` vs `seq_cst`.
+
 
 ### book-keeping policies
 
