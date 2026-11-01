@@ -1,113 +1,203 @@
+#define _GNU_SOURCE // Enables pthread_barrier_t and pthread_setaffinity_np
+#include "src/core.h"
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <pthread.h>
+#include <sched.h>
+#include <stdio.h>
 
-// DEFINE SAMPLE_INTERVAL
-// DEFINE MIN_BUFFER_SIZE
-// DEFINE NUM_ELEMENTS_TO_PUSH
-// Make these runtime arguments
+#define DEFAULT_SAMPLE_INTERVAL 1000
+#define DEFAULT_MIN_BUFFER_SIZE 2
+#define DEFAULT_NUM_ELEMENTS (1 << 20)
+#define PRODUCER_CORE 0
+#define CONSUMER_CORE 1
 
 typedef struct {
-    // Pointer to Queue;
-
-    // Pointer to Array (Elements to Push);
-
-    // Num of Elements;
-
-    // Interval to take timestamp;
-
-    // Pointer to Array (PushTimestamp);
-
-    // Place to put start timestamp;
+    lockfreeSpscQueue* ptrToQueue;
+    pthread_barrier_t* startBarrier;
+    void** ptrToElementsToPush;
+    int numElementsToPush;
+    int sampleInterval;
+    struct timespec* ptrToPushTimestamps;
+    struct timespec* ptrToStartTimestamp;
 } ProducerArgs;
 
-
 typedef struct {
-    // Pointer to Queue;
-
-    // Pointer to Array (PutPoppedElements);
-    
-    // Num of Elements;
-
-    // Interval to take timestamp;
-
-    // Pointer to Array (PopTimestamp);
-
-    // Place to put end timestamp;
+    lockfreeSpscQueue* ptrToQueue;
+    pthread_barrier_t* startBarrier;
+    void** ptrToPutPoppedElements;
+    int numElementsToPop;
+    int sampleInterval;
+    struct timespec* ptrToPopTimestamps;
+    struct timespec* ptrToEndTimestamp;
 } ConsumerArgs;
 
-int main () {
-    // 1. Initialize Queue (Make it aligned to cache line so false sharing is always distinguishable); Pointer to the struct to be passed to worker threads
+void preFault(size_t totalBytes, void* pointerToMemory);
+void* producerThread(void* pArgs);
+void* consumerThread(void* cArgs);
+void pinThreadToCore(pthread_t thread, int coreId);
 
-    // 2. Initialize Array; Initialize Array with Pointers to elements of previous array; Pointer to this array to be passed to the producer thread
+int main(int argc, char* argv[]) {
+    int sampleInterval = (argc > 1) ? atoi(argv[1]) : DEFAULT_SAMPLE_INTERVAL;
+    int minBufferSize  = (argc > 2) ? atoi(argv[2]) : DEFAULT_MIN_BUFFER_SIZE;
+    int numElements    = (argc > 3) ? atoi(argv[3]) : DEFAULT_NUM_ELEMENTS;
+    int numSamples     = (numElements + sampleInterval - 1) / sampleInterval;
 
-    // 3. Initialize Empty Array for Popped Elements; Pointer to the array to be passed to the consumer thread
+    // 1. Initialize Queue
+    lockfreeSpscQueue* ptrToQueue = initQueue(minBufferSize);
 
-    // 4. Initialize PushTimestamp Array
+    // 2. Initialize Elements to Push
+    void** ptrToElementsToPush = malloc(sizeof(void*) * numElements);
+    for (int i = 0; i < numElements; i++) {
+        ptrToElementsToPush[i] = malloc(sizeof(int));
+        *((int*)ptrToElementsToPush[i]) = i;
+    }
 
-    // 5. Initialize PopTimestamp Array
+    // 3. Allocate Popped Array & Timestamp Arrays (sized to numSamples)
+    void** ptrToPutPoppedElements      = malloc(sizeof(void*) * numElements);
+    struct timespec* ptrToPushTimestamps = malloc(sizeof(struct timespec) * numSamples);
+    struct timespec* ptrToPopTimestamps  = malloc(sizeof(struct timespec) * numSamples);
+    struct timespec* ptrToStartTimestamp = malloc(sizeof(struct timespec));
+    struct timespec* ptrToEndTimestamp   = malloc(sizeof(struct timespec));
 
-    // 6. Pre-Fault RingBuffer, EmptyArray, PushTimestamp and PopTimestamp
+    // 4. Pre-Fault Arrays using exact byte sizes (do NOT overwrite ptrToQueue struct fields)
+    preFault(sizeof(void*) * numElements, ptrToPutPoppedElements);
+    preFault(sizeof(struct timespec) * numSamples, ptrToPushTimestamps);
+    preFault(sizeof(struct timespec) * numSamples, ptrToPopTimestamps);
+    preFault(sizeof(struct timespec), ptrToStartTimestamp);
+    preFault(sizeof(struct timespec), ptrToEndTimestamp);
 
+    // 5. Set up synchronization barrier and thread args
+    pthread_barrier_t startBarrier;
+    pthread_barrier_init(&startBarrier, NULL, 2);
 
+    ProducerArgs producerArgs = {
+        .ptrToQueue = ptrToQueue,
+        .startBarrier = &startBarrier,
+        .ptrToElementsToPush = ptrToElementsToPush,
+        .numElementsToPush = numElements,
+        .sampleInterval = sampleInterval,
+        .ptrToPushTimestamps = ptrToPushTimestamps,
+        .ptrToStartTimestamp = ptrToStartTimestamp
+    };
 
-    // 7. Synchronize Start for producerThread and ConsumerThread; Pin each to their own (distinct) physical CPU core.
+    ConsumerArgs consumerArgs = {
+        .ptrToQueue = ptrToQueue,
+        .startBarrier = &startBarrier,
+        .ptrToPutPoppedElements = ptrToPutPoppedElements,
+        .numElementsToPop = numElements,
+        .sampleInterval = sampleInterval,
+        .ptrToPopTimestamps = ptrToPopTimestamps,
+        .ptrToEndTimestamp = ptrToEndTimestamp
+    };
 
-    // 8. Wait for both to finish
+    // 6. Create and pin threads to distinct cores
+    pthread_t producerThreadId, consumerThreadId;
+    pthread_create(&producerThreadId, NULL, producerThread, &producerArgs);
+    pthread_create(&consumerThreadId, NULL, consumerThread, &consumerArgs);
 
-    // 9. Perform correctness check: compare elements that were to be pushed against popped elements.
+    pinThreadToCore(producerThreadId, PRODUCER_CORE);
+    pinThreadToCore(consumerThreadId, CONSUMER_CORE);
 
-    // 10. Compute Latencies and Throughput and write to a file. 
+    // 7. Wait for both threads to finish
+    pthread_join(producerThreadId, NULL);
+    pthread_join(consumerThreadId, NULL);
+    pthread_barrier_destroy(&startBarrier);
 
-    // 11. Free Queue and Arrays
-    
+    // 8. Correctness check
+    for (int i = 0; i < numElements; i++) {
+        if (ptrToElementsToPush[i] != ptrToPutPoppedElements[i]) {
+            fprintf(stderr, "Error: Element at index %d does not match\n", i);
+            return 1;
+        }
+    }
+
+    // 9. Write sampled timestamps to CSV
+    FILE* fp = fopen("latency_throughput.csv", "w");
+    if (fp == NULL) {
+        fprintf(stderr, "Error: Could not open file for writing\n");
+        return 1;
+    }
+    fprintf(fp, "PushTimestamp,PopTimestamp,StartTimestamp,EndTimestamp\n");
+    for (int s = 0; s < numSamples; s++) {
+        fprintf(fp, "%ld.%09ld,%ld.%09ld,%ld.%09ld,%ld.%09ld\n",
+                ptrToPushTimestamps[s].tv_sec, ptrToPushTimestamps[s].tv_nsec,
+                ptrToPopTimestamps[s].tv_sec, ptrToPopTimestamps[s].tv_nsec,
+                ptrToStartTimestamp->tv_sec, ptrToStartTimestamp->tv_nsec,
+                ptrToEndTimestamp->tv_sec, ptrToEndTimestamp->tv_nsec);
+    }
+    fclose(fp);
+
+    // 10. Free memory cleanly
+    for (int i = 0; i < numElements; i++) {
+        free(ptrToElementsToPush[i]);
+    }
+    free(ptrToElementsToPush);
+    free(ptrToPutPoppedElements);
+    free(ptrToPushTimestamps);
+    free(ptrToPopTimestamps);
+    free(ptrToStartTimestamp);
+    free(ptrToEndTimestamp);
+    free(ptrToQueue); // Replace with destroyQueue(ptrToQueue) if internal buffer was malloc'd
+
     return 0;
 }
 
-void* producerThread (void* pArgs) { // Pushes items from a given array to the ring buffer
-    // 1. Dereference and Cast pArgs to ProducerArgs
-
-    // 2. Take before timestamp for throughput.
-    // 3. For-Loop pushing elements 
-        // a. Take and store PushTimestamp at specified intervals.
-        // b. While-Loop until push is successful.
-
+void pinThreadToCore(pthread_t thread, int coreId) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(coreId, &cpuset);
+    if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset) != 0) {
+        perror("Warning: Failed to pin thread to core");
+    }
 }
 
-void* consumerThread (void* cArgs) { // Pops items from the ring buffer into a given array
-    // 1. Dereference and Cast cArgs to ConsumerArgs
+void* producerThread(void* pArgs) {
+    ProducerArgs* args = (ProducerArgs*)pArgs;
+    pthread_barrier_wait(args->startBarrier);
 
-    // 2. For-Loop popping elements
-        // a. While-Loop until pop is successful
-        // b. Take and store PopTimestamp at specified intervals.
-    // Take after timestamp for throughput.
+    clock_gettime(CLOCK_MONOTONIC, args->ptrToStartTimestamp);
+
+    for (int i = 0; i < args->numElementsToPush; i++) {
+        if (i % args->sampleInterval == 0) {
+            clock_gettime(CLOCK_MONOTONIC, &args->ptrToPushTimestamps[i / args->sampleInterval]);
+        }
+        while (!tryPushToQueue(args->ptrToQueue, args->ptrToElementsToPush[i])) {
+            // busy wait
+        }
+    }
+    return NULL;
 }
 
+void* consumerThread(void* cArgs) {
+    ConsumerArgs* args = (ConsumerArgs*)cArgs;
+    pthread_barrier_wait(args->startBarrier);
 
-void preFault (int capacity, void** pointerToMemory) { // PreFaults Memory
-    // Validating arguments
-    if (capacity <= 0 || pointerToMemory == NULL) {
+    for (int i = 0; i < args->numElementsToPop; i++) {
+        while (!tryPopFromQueue(args->ptrToQueue, &(args->ptrToPutPoppedElements[i]))) {
+            // busy wait
+        }
+        if (i % args->sampleInterval == 0) {
+            clock_gettime(CLOCK_MONOTONIC, &args->ptrToPopTimestamps[i / args->sampleInterval]);
+        }
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, args->ptrToEndTimestamp);
+    return NULL;
+}
+
+void preFault(size_t totalBytes, void* pointerToMemory) {
+    if (totalBytes == 0 || pointerToMemory == NULL) {
         return;
     }
 
-    // 1. Get the page size
     long pageSize = sysconf(_SC_PAGESIZE);
+    volatile char* bytePtr = (volatile char*)pointerToMemory;
 
-    // malloc, by default, aligns our memory to multiples of 16. What exactly does this mean?
-    // pointerToMemory is some memory address that is a multiple of 16. Our page frames begin at memory addresses that are multiples of the page size.
-    // If pointerToMemory is coincidentally some multiple of the pageSize, it'd be sufficient to touch every pageSize-th byte starting from pointerToMemory (relative 0).
-    // But this is not necessarily the case. 
-    // Suppose we had pointerToMemory somewhere in the middle of a page frame, and numBytes was smaller than pageSize, but enough to overflow into the next page frame. By the former logic, we'd only touch pointerToMemory (relative 0),
-    // but its possible that the next page frame remained uninitialized, and cause a page fault on our hot-path - a problem. The solution? We simply touch the last byte of numBytes to ensure all our page frames are loaded.
-
-    // 2. PreFault at intervals
-    for (int i = 0; i < capacity; i += (pageSize / sizeof(void*))) { // We want to increment `i` such that it incrementSize is exactly the number of void* that occupy pageSize bytes. 
-        (((volatile void**)pointerToMemory)[i]) = NULL; // pointerToMemory[i] is the same as (pointerToMemory + i * (sizeof(void*)));
-        // We cast pointerToMemory as a volatile pointer so the compiler doesn't optimize away the loop.
-        // A volatile variable tells the compiler that this variable may change at anytime from outside the current code path, meaning the compiler must never optimize away reads or writes to it.
+    for (size_t i = 0; i < totalBytes; i += pageSize) {
+        bytePtr[i] = 0;
     }
-
-
-    // 3. Unconditionally PreFault Final Chunk
-    (((volatile void**)pointerToMemory)[capacity - 1]) = NULL; // capacity-1 is the index of the final element in the array
-
-    return;
+    bytePtr[totalBytes - 1] = 0;
 }
