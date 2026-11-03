@@ -30,7 +30,7 @@ CPU_SET=0,2,4 ./run_containerized_harness.sh ./results 4096 8388608
 
 ## latency analysis notebook
 
-after generating csvs in `./results`, open `analysis.ipynb` to analyze and visualize latencies.
+after generating csvs in `./results`, open `analysis.ipynb` to visualize throughput.
 
 
 ### book-keeping policies
