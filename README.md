@@ -1,6 +1,8 @@
 # lockfree-spsc-queue-c
 a lock-free single-producer-single-consumer queue in c
 
+!(output.png)
+
 ## variants
 
 - `src/0-naive`, `src/1-padding_without_cached_indices`, `src/2-cached_indices_without_padding`, `src/1-cached_indices_and_padding`, `src/2-bitwise_modulus`: acquire/release based variants.
@@ -8,7 +10,7 @@ a lock-free single-producer-single-consumer queue in c
 
 ## containerized harness run
 
-run every queue variant in docker and save each latency csv into a host directory:
+run every queue variant in docker and save each of 10 runs of latency/throughput measurement csv into a host directory:
 
 ```bash
 ./run_containerized_harness.sh ./results
@@ -16,23 +18,19 @@ run every queue variant in docker and save each latency csv into a host director
 
 this script:
 - builds the image from `Dockerfile`,
-- runs it with `--cpuset-cpus=0,1,2` by default (exactly 3 host cores),
-- compiles/runs the harness against all ten queue variants,
-- writes one csv per variant to `./results`.
+- runs it with `--cpuset-cpus=0,2,4` by default (exactly 3 host cores),
+- compiles/runs the harness against all ten queue variants 10 times, in a randomized order,
+- writes one csv per run, per variant to `./results/{run-01 .. run-10}/{variant-name}`.
 
 you can override harness/runtime settings:
 
 ```bash
-CPU_SET=0,1,2 ./run_containerized_harness.sh ./results 1000 2 1048576
+CPU_SET=0,2,4 ./run_containerized_harness.sh ./results 4096 8388608
 ```
 
 ## latency analysis notebook
 
-after generating csvs in `./results`, open `latency_analysis.ipynb` to analyze and visualize latencies:
-
-- one box plot per variant across the five buffer sizes,
-- all variants compared at the smallest and largest buffer sizes,
-- latency distribution overlays for each buffer size.
+after generating csvs in `./results`, open `analysis.ipynb` to analyze and visualize latencies.
 
 
 ### book-keeping policies

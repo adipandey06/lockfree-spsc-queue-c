@@ -6,11 +6,10 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-# Usage: [CPU_SET=p,c,h] ./run.sh [output_dir] [sample_interval] [num_elements]
+# Usage: [CPU_SET=p,c,h] ./run_containerized_harness.sh [output_dir] [sample_interval] [num_elements]
 OUTPUT_DIR="${1:-./results}"
-SAMPLE_INTERVAL="${2:-4096}" # 2^12 elements
+SAMPLE_INTERVAL="${2:-4096}" # 2^12 => 2^23 / 2^12 = 2^11 samples
 NUM_ELEMENTS="${3:-8388608}" # 2^23 elements
-# 2^11 samples
 CPU_SET="${CPU_SET:-0,2,4}"
 
 # CPU_SET is "producer,consumer,harness" in HOST numbering (--cpuset-cpus keeps host ids).
