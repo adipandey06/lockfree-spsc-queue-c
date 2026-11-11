@@ -1,4 +1,7 @@
-what does this readme contain?
+tldr: clone the repo and run `./run_containerized_harness.sh` to get a plot of throughput of ten implementations of a single-producer-single-consumer lock-free queue against the size of the queue/buffer.
+
+
+**what does this readme contain?**
 
 1. [a description of what this repo contains;](#1-what-does-this-repo-contain)
 2. [a description of the algorithm of the push/pop operations.](#2-how-do-the-operations-work)
