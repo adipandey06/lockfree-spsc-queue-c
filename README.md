@@ -1,39 +1,32 @@
-# lockfree-spsc-queue-c
-a lock-free single-producer-single-consumer queue in c
+what does this readme contain?
 
-![image](output.png)
+1. [[readme#1. what does this repo contain?|a description of what this repo contains;]] 
+2. [[readme#2. how do the operations work?|a description of the algorithm of the push/pop operations.]]
 
-## variants
+### 1. what does this repo contain? 
 
-- `src/0-naive`, `src/1-padding_without_cached_indices`, `src/2-cached_indices_without_padding`, `src/1-cached_indices_and_padding`, `src/2-bitwise_modulus`: acquire/release based variants.
-- `src/0-naive-seq_cst`, `src/1-padding_without_cached_indices-seq_cst`, `src/2-cached_indices_without_padding-seq_cst`, `src/1-cached_indices_and_padding-seq_cst`, `src/2-bitwise_modulus-seq_cst`: sequential-consistency variants where all atomic accesses use `memory_order_seq_cst`.
+**three things**:
 
-## containerized harness run
+1. five implementations of a single-producer, single-consumer lock-free queue. a naive implementation going off of intuition, an implementation the head and tail indices on different cache lines to minimize false sharing, an implementation with cached indices to (ideally) minimize true sharing, and a version with both, and finally extending this version with a bitwise operation to replace the costly modulus operation. each of these five implementations have two variants: one with sequentially consistent memory ordering, and one with acquire release semantics.
 
-run every queue variant in docker and save each of 10 runs of latency/throughput measurement csv into a host directory:
-
-```bash
-./run_containerized_harness.sh ./results
-```
-
-this script:
-- builds the image from `Dockerfile`,
-- runs it with `--cpuset-cpus=0,2,4` by default (exactly 3 host cores),
-- compiles/runs the harness against all ten queue variants 10 times, in a randomized order,
-- writes one csv per run, per variant to `./results/{run-01 .. run-10}/{variant-name}`.
-
-you can override harness/runtime settings:
-
-```bash
-CPU_SET=0,2,4 ./run_containerized_harness.sh ./results 4096 8388608
-```
-
-## latency analysis notebook
-
-after generating csvs in `./results`, open `analysis.ipynb` to visualize throughput.
+2. a benchmark for each of these implementations. 
+	- what does the benchmark do? 
+		for every variant of every implementation, it queues `<num_of_elements>`  pointers using `tryPushToQueue`, and dequeues them using `tryPopFromQueue`. it takes timestamps using the monotonic clock at a resolution of nanoseconds once before the first push, once after the final pop, and once every `<sample_interval>` elements, and writes them to a csv, respectively. it runs `<num_of_runs>` iterations of this exactly, with the order of variants being selected at random. it then runs the jupyter notebook.
+	
+	- what does the jupyter notebook do?
+		plots the (averaged) throughput of each implementation against buffer sizes. saves the plot, `output.png`, and the executed jupyter notebook, `analysis.ipynb` to `OUTPUT_DIR`.
+	  
+	- how do you run the benchmark? 
+		  in the directory where you've cloned the repo, run `CPU_SET = <> ./run_containerized_harness <num_of_runs> <output_directory> <sample_interval> <num_of_elements>`
+			- `CPU_SET` holds the thread numbers on which the producer, consumer and harness processes run respectively. by default: `0,2,4`;
+			- `<output_directory>` is the relative path of where you want the csv's to be saved. by default: `/results`;
+			- `<num_of_runs>` self explanatory. by default: `1`.
+			- `<sample_interval>` self explanatory. by default: `4096`.
+			- `<num_of_elements>` self explanatory. by default: `8388608`.
 
 
-### book-keeping policies
+
+### 2. how do the operations work?
 
 we begin with both the head and tail initialized to 0. the head tracks the latest item published to the queue, and the tail tracks the next item to be consumed from the queue.
 
