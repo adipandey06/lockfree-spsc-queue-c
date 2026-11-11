@@ -11,6 +11,7 @@ NUM_RUNS="${1:-1}"
 OUTPUT_DIR="${2:-./results}"
 SAMPLE_INTERVAL="${3:-4096}"
 NUM_ELEMENTS="${4:-8388608}" 
+MEMORY_SIZE="${5:-12g}" # for a 16g host
 CPU_SET="${CPU_SET:-0,2,4}"
 
 # CONTEXT (Syntax for variables):
@@ -62,6 +63,8 @@ docker build -t lockfree-spsc-harness .
 
 docker run --rm \
   --cpuset-cpus="${CPU_SET}" \
+  --memory="${MEMORY_SIZE}" \
+  --memory-swap="${MEMORY_SIZE}" \
   -e OUTPUT_DIR=/results \
   -e SAMPLE_INTERVAL="${SAMPLE_INTERVAL}" \
   -e NUM_ELEMENTS="${NUM_ELEMENTS}" \
@@ -82,6 +85,8 @@ docker run --rm \
 # CONTEXT (docker run arguments):
 # --rm: automatically remove the container when it exits
 # --cpuset-cpus: restrict the container to specific CPUs
+# --memory: limit the container's memory usage
+# --memory-swap: setting memory = memory-swap ensures that the container cannot use swap space, effectively limiting it to the specified memory limit.
 # -e: set environment variables inside the container
 # -v: mount a volume (host directory to container directory)
 #     -v "${OUTPUT_DIR}:/results": mounts the host's OUTPUT_DIR to /results in the container, allowing the container to write results to the host filesystem.
