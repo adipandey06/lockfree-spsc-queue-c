@@ -5,18 +5,18 @@ what does this readme contain?
 
 ### 1. what does this repo contain? 
 
-**three things**:
+**two things**:
 
 1. five implementations of a single-producer, single-consumer lock-free queue. a naive implementation going off of intuition, an implementation the head and tail indices on different cache lines to minimize false sharing, an implementation with cached indices to (ideally) minimize true sharing, and a version with both, and finally extending this version with a bitwise operation to replace the costly modulus operation. each of these five implementations have two variants: one with sequentially consistent memory ordering, and one with acquire release semantics.
 
 2. a benchmark for each of these implementations. 
-	- what does the benchmark do? 
+	- **_what does the benchmark do_**? 
 		for every variant of every implementation, it queues `<num_of_elements>`  pointers using `tryPushToQueue`, and dequeues them using `tryPopFromQueue`. it takes timestamps using the monotonic clock at a resolution of nanoseconds once before the first push, once after the final pop, and once every `<sample_interval>` elements, and writes them to a csv, respectively. it runs `<num_of_runs>` iterations of this exactly, with the order of variants being selected at random. it then runs the jupyter notebook.
 	
-	- what does the jupyter notebook do?
+	- **_what does the jupyter notebook do_**?
 		plots the (averaged) throughput of each implementation against buffer sizes. saves the plot, `output.png`, and the executed jupyter notebook, `analysis.ip` to `OUTPUT_DIR`.
 	  
-	- how do you run the benchmark? 
+	- **_how do you run the benchmark_**? 
 		  in the directory where you've cloned the repo, run `CPU_SET = <> ./run_containerized_harness <num_of_runs> <output_directory> <sample_interval> <num_of_elements>`
 			- `CPU_SET` holds the thread numbers on which the producer, consumer and harness processes run respectively. by default: `0,2,4`;
 			- `<output_directory>` is the relative path of where you want the csv's to be saved. by default: `/results`;
