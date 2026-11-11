@@ -1,8 +1,7 @@
 what does this readme contain?
 
-1. [[readme#1. what does this repo contain?|a description of what this repo contains;]] 
-2. [[readme#2. how do the operations work?|a description of the algorithm of the push/pop operations.]]
-
+1. [[#1. what does this repo contain?|a description of what this repo contains;]] 
+2. [[#2. how do the operations work?|a description of the algorithm of the push/pop operations.]]
 ### 1. what does this repo contain? 
 
 **three things**:
@@ -14,7 +13,7 @@ what does this readme contain?
 		for every variant of every implementation, it queues `<num_of_elements>`  pointers using `tryPushToQueue`, and dequeues them using `tryPopFromQueue`. it takes timestamps using the monotonic clock at a resolution of nanoseconds once before the first push, once after the final pop, and once every `<sample_interval>` elements, and writes them to a csv, respectively. it runs `<num_of_runs>` iterations of this exactly, with the order of variants being selected at random. it then runs the jupyter notebook.
 	
 	- what does the jupyter notebook do?
-		plots the (averaged) throughput of each implementation against buffer sizes. saves the plot, `output.png`, and the executed jupyter notebook, `analysis.ipynb` to `OUTPUT_DIR`.
+		plots the (averaged) throughput of each implementation against buffer sizes. saves the plot, `output.png`, and the executed jupyter notebook, `analysis.ip` to `OUTPUT_DIR`.
 	  
 	- how do you run the benchmark? 
 		  in the directory where you've cloned the repo, run `CPU_SET = <> ./run_containerized_harness <num_of_runs> <output_directory> <sample_interval> <num_of_elements>`
