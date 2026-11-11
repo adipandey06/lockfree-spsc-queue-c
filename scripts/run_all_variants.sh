@@ -29,17 +29,27 @@ mkdir -p "${OUTPUT_DIR}"
 
 for ((run = 1; run <= NUM_RUNS; run++)); do
   mapfile -t run_variants < <(printf '%s\n' "${VARIANTS[@]}" | shuf)
+  # CONTEXT (mapfile -t run_variants < <(printf '%s\n' "${VARIANTS[@]}" | shuf)):
+  # This command reads the shuffled list of variants into an array called run_variants. The `shuf` command randomizes the order of the variants, and `mapfile -t` reads each line of the shuffled output into the run_variants array without including the newline characters.
+
   run_label="$(printf '%02d' "${run}")"
+  # CONTEXT (run_label="$(printf '%02d' "${run}")"): This command formats the current run number as a two-digit string with leading zeros (e.g., "01", "02", ..., "10") and assigns it to the variable run_label. This is useful for creating consistent directory names for each run's results.
 
   for variant in "${run_variants[@]}"; do
     binary_path="/tmp/harness-${variant}"
     run_dir="$(mktemp -d)"
+    # CONTEXT (run_dir="$(mktemp -d)"): This command creates a temporary directory and assigns its path to the variable run_dir. The `mktemp -d` command generates a unique directory name in the system's temporary directory, which is useful for isolating each run's files and avoiding conflicts.
 
     gcc -O3 -pthread \
       -I"/workspace/src/${variant}" \
       /workspace/test/harness.c \
       "/workspace/src/${variant}/core.c" \
       -o "${binary_path}"
+
+    # CONTEXT (gcc -O3 -pthread ...): This command compiles the harness.c file along with the core.c file from the specified variant directory. The `-O3` flag enables optimization level 3 for better performance, and `-pthread` links the pthread library for multithreading support. The `-I` flag specifies the include directory for the variant's header files. The output binary is saved to the path specified by binary_path.
+    # -I "/workspace/src/${variant}": This option tells the compiler to look for header files in the specified directory, which is where the variant's core.c and any associated headers are located. This allows the harness to include the correct implementation of the lock-free SPSC queue for each variant.
+    # /workspace/test/harness.c: This is the main test harness source file that contains the logic for running the producer-consumer benchmark. It includes the necessary headers and defines the main function that sets up the test environment, creates threads, and measures performance metrics such as latency and throughput.
+    # "/workspace/src/${variant}/core.c": This is the source file for the specific variant of the lock-free SPSC queue implementation. It contains the core logic for the producer-consumer queue, including enqueue and dequeue operations, memory management, and any optimizations specific to that variant.
 
     (
       cd "${run_dir}"
