@@ -65,3 +65,5 @@ for ((run = 1; run <= NUM_RUNS; run++)); do
     echo "Saved ${OUTPUT_DIR}/${variant}/run-${run_label}/latency_throughput_buffer_*.csv"
   done
 done
+
+python3 -m scripts.run_analysis_notebook

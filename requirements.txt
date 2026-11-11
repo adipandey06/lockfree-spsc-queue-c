@@ -1,0 +1,10 @@
+# Data handling & math
+numpy>=1.26.0
+pandas>=2.2.0
+
+# Plotting & saving benchmark charts
+matplotlib>=3.8.0
+
+# Headless / CLI Jupyter execution
+nbconvert>=7.14.0
+ipykernel>=6.29.0

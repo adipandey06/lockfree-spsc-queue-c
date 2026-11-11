@@ -42,7 +42,7 @@ if [[ "${#CPUS[@]}" != "3" ]]; then
   exit 1
 fi
 
-PRODUCER_CORE="${CPUS[0]}"git
+PRODUCER_CORE="${CPUS[0]}"
 CONSUMER_CORE="${CPUS[1]}"
 HARNESS_CORE="${CPUS[2]}"
 
