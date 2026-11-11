@@ -1,7 +1,8 @@
 what does this readme contain?
 
-1. [[#1. what does this repo contain?|a description of what this repo contains;]] 
-2. [[#2. how do the operations work?|a description of the algorithm of the push/pop operations.]]
+1. [a description of what this repo contains;](#1.-what-does-this-repo-contain)
+2. [a description of the algorithm of the push/pop operations.](#2.-how-do-the-operations-work)
+
 ### 1. what does this repo contain? 
 
 **three things**:
